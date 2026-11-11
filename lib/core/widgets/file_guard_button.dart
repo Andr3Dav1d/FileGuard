@@ -112,9 +112,13 @@ class FileGuardButton extends StatelessWidget {
             Icon(icon, size: 20, color: foregroundColor),
             const SizedBox(width: AppSpacing.space8),
           ],
-          Text(
-            label,
-            style: AppTypography.bodyCompact.copyWith(color: foregroundColor),
+          Flexible(
+            child: Text(
+              label,
+              style: AppTypography.bodyCompact.copyWith(color: foregroundColor),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       );
