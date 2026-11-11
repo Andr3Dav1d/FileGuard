@@ -5,7 +5,7 @@ class ApkInstallService {
   const ApkInstallService();
 
   static const MethodChannel _channel =
-      MethodChannel('com.example.fileguard/apk_installer');
+      MethodChannel('dev.andr3dav1d.fileguard/apk_installer');
 
   /// Abre o instalador nativo do sistema para o APK especificado.
   /// Só deve ser acionado por clique explícito do usuário após a exibição do relatório de ameaças.

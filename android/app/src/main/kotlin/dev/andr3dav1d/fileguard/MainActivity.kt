@@ -1,4 +1,4 @@
-package com.example.fileguard
+package dev.andr3dav1d.fileguard
 
 import android.content.Intent
 import android.net.Uri
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.fileguard/apk_installer"
+    private val CHANNEL = "dev.andr3dav1d.fileguard/apk_installer"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

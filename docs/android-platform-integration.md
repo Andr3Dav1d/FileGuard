@@ -22,7 +22,7 @@ Quando o usuário decide voluntariamente instalar um pacote APK após a revisão
 2. **Caminhos Acessíveis**:
    Configurados em `android/app/src/main/res/xml/file_paths.xml` com suporte a arquivos em cache, armazenamento interno e caminhos públicos temporários.
 3. **Platform Channel Kotlin (`MainActivity.kt`)**:
-   - Canal: `com.example.fileguard/apk_installer`
+   - Canal: `dev.andr3dav1d.fileguard/apk_installer`
    - Método: `installApk`
    - O código Kotlin obtém uma `content://` URI segura via `FileProvider.getUriForFile()`.
    - Dispara uma `Intent(Intent.ACTION_VIEW)` com o MIME `application/vnd.android.package-archive` e as flags `FLAG_GRANT_READ_URI_PERMISSION` e `FLAG_ACTIVITY_NEW_TASK`.
