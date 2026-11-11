@@ -4,4 +4,5 @@ abstract final class AppRoutes {
   static const String scanner = '/scanner';
   static const String history = '/history';
   static const String settings = '/settings';
+  static const String onboarding = '/onboarding';
 }

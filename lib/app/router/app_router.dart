@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/history/presentation/screens/history_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/onboarding/presentation/providers/onboarding_provider.dart';
+import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/scanner/presentation/screens/scanner_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../shell/file_guard_shell.dart';
@@ -13,10 +15,17 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Provedor Riverpod para a instância gerenciada do [GoRouter].
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final hasSeenOnboarding = ref.watch(hasSeenOnboardingProvider);
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: AppRoutes.home,
+    initialLocation: hasSeenOnboarding ? AppRoutes.home : AppRoutes.onboarding,
     routes: <RouteBase>[
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.onboarding,
+        builder: (context, state) => const OnboardingScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return FileGuardShell(navigationShell: navigationShell);

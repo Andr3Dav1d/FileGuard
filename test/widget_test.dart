@@ -1,9 +1,15 @@
 import 'package:fileguard/app/app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'fg_has_seen_onboarding': true});
+  });
   testWidgets('FileGuardApp inicializa com barra de navegação inferior', (
     WidgetTester tester,
   ) async {

@@ -2,9 +2,15 @@ import 'package:fileguard/app/app.dart';
 import 'package:fileguard/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'fg_has_seen_onboarding': true});
+  });
   group('Visual & Layout Regression Tests (Figma 412x917 viewport)', () {
     testWidgets(
       'Sem overflow e cores de superfície corretas no tema Claro',
