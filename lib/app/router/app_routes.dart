@@ -5,4 +5,5 @@ abstract final class AppRoutes {
   static const String history = '/history';
   static const String settings = '/settings';
   static const String onboarding = '/onboarding';
+  static const String technicalDetails = '/technical-details';
 }
