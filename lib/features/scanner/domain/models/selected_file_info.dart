@@ -1,3 +1,5 @@
+import 'package:fileguard/core/utils/file_size_formatter.dart';
+
 /// Informações e metadados de um arquivo selecionado para análise.
 class SelectedFileInfo {
   const SelectedFileInfo({
@@ -29,14 +31,7 @@ class SelectedFileInfo {
       mimeType == 'application/vnd.android.package-archive';
 
   /// Retorna tamanho formatado legível (ex: 2.4 MB).
-  String get formattedSize {
-    if (size < 1024) return '$size B';
-    if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
-    if (size < 1024 * 1024 * 1024) {
-      return '${(size / (1024 * 1024)).toStringAsFixed(2)} MB';
-    }
-    return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
+  String get formattedSize => FileSizeFormatter.format(size);
 
   SelectedFileInfo copyWith({
     String? name,

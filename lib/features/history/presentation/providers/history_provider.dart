@@ -28,6 +28,12 @@ class HistoryNotifier extends AsyncNotifier<List<ScanReport>> {
     await refresh();
   }
 
+  Future<int> importReports(List<ScanReport> reports) async {
+    final count = await _repository.saveReports(reports);
+    await refresh();
+    return count;
+  }
+
   Future<void> deleteReport(String id) async {
     await _repository.deleteReport(id);
     await refresh();

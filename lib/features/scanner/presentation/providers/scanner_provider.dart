@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:fileguard/features/history/presentation/providers/history_provider.dart';
@@ -8,6 +7,9 @@ import 'package:fileguard/features/scanner/domain/models/scan_report.dart';
 import 'package:fileguard/features/scanner/domain/models/selected_file_info.dart';
 import 'package:fileguard/features/scanner/domain/repositories/virus_total_repository.dart';
 import 'package:fileguard/features/settings/presentation/providers/api_key_provider.dart';
+
+/// Limite máximo em bytes suportado pelo endpoint padrão de upload do VirusTotal v3 (32 MB).
+const int _maxUploadSizeBytes = 32 * 1024 * 1024;
 
 /// Provedor do repositório VirusTotal.
 final virusTotalRepositoryProvider = Provider<VirusTotalRepository>((ref) {
@@ -28,6 +30,7 @@ enum ScannerStep {
   promptConsent,
   uploading,
   analyzing,
+  queued,
   completed,
   error,
 }
@@ -40,6 +43,7 @@ class ScannerState {
     this.uploadProgress,
     this.statusText,
     this.errorMessage,
+    this.pendingAnalysisId,
   });
 
   final ScannerStep step;
@@ -48,6 +52,7 @@ class ScannerState {
   final double? uploadProgress;
   final String? statusText;
   final String? errorMessage;
+  final String? pendingAnalysisId;
 
   bool get isLoading =>
       step == ScannerStep.hashing ||
@@ -62,7 +67,9 @@ class ScannerState {
     double? uploadProgress,
     String? statusText,
     String? errorMessage,
+    String? pendingAnalysisId,
     bool clearReport = false,
+    bool clearPendingAnalysisId = false,
   }) {
     return ScannerState(
       step: step ?? this.step,
@@ -71,6 +78,9 @@ class ScannerState {
       uploadProgress: uploadProgress ?? this.uploadProgress,
       statusText: statusText ?? this.statusText,
       errorMessage: errorMessage ?? this.errorMessage,
+      pendingAnalysisId: clearPendingAnalysisId
+          ? null
+          : (pendingAnalysisId ?? this.pendingAnalysisId),
     );
   }
 }
@@ -128,7 +138,18 @@ class ScannerNotifier extends Notifier<ScannerState> {
         // Persiste no histórico local
         await ref.read(historyNotifierProvider.notifier).addReport(lookupResult.report);
       } else if (lookupResult is HashLookupNotFound) {
-        // 404: Hash não encontrado. Exibe solicitação de consentimento para upload.
+        // 404: Hash não encontrado.
+        if (fileInfo.size > _maxUploadSizeBytes) {
+          state = state.copyWith(
+            step: ScannerStep.error,
+            errorMessage:
+                'O arquivo selecionado (${fileInfo.formattedSize}) excede o limite máximo de 32 MB '
+                'suportado pela API pública do VirusTotal para uploads.',
+          );
+          return;
+        }
+
+        // Exibe solicitação de consentimento para upload.
         state = state.copyWith(
           step: ScannerStep.promptConsent,
           statusText: 'Arquivo não catalogado no VirusTotal.',
@@ -158,6 +179,15 @@ class ScannerNotifier extends Notifier<ScannerState> {
       return;
     }
 
+    if (file.size > _maxUploadSizeBytes) {
+      state = state.copyWith(
+        step: ScannerStep.error,
+        errorMessage:
+            'O arquivo selecionado (${file.formattedSize}) excede o limite de 32 MB para envio ao VirusTotal.',
+      );
+      return;
+    }
+
     state = state.copyWith(
       step: ScannerStep.uploading,
       statusText: 'Enviando arquivo ao VirusTotal...',
@@ -165,29 +195,31 @@ class ScannerNotifier extends Notifier<ScannerState> {
     );
 
     try {
-      final ioFile = File(file.path);
-      final bytes = await ioFile.readAsBytes();
-
-      state = state.copyWith(uploadProgress: 0.7);
+      state = state.copyWith(uploadProgress: 0.5);
 
       final analysisId = await _vtRepository.uploadFile(
-        bytes: bytes,
+        filePath: file.path,
         fileName: file.name,
       );
 
       state = state.copyWith(
         step: ScannerStep.analyzing,
         statusText: 'Análise enfileirada no VirusTotal. Aguardando motores...',
-        uploadProgress: 0.9,
+        uploadProgress: 0.7,
       );
 
-      // Polling com intervalo seguro
-      ScanReport? completedReport;
-      for (int i = 0; i < 6; i++) {
-        await Future.delayed(const Duration(seconds: 4));
-        completedReport = await _vtRepository.getAnalysis(analysisId);
-        if (completedReport != null) break;
-      }
+      // Polling progressivo com backoff exponencial e tratamento de cota
+      final completedReport = await _vtRepository.pollAnalysis(
+        analysisId: analysisId,
+        fileName: file.name,
+        fileSize: file.size,
+        onProgress: (statusMessage, progress) {
+          state = state.copyWith(
+            statusText: statusMessage,
+            uploadProgress: progress,
+          );
+        },
+      );
 
       if (completedReport != null) {
         state = state.copyWith(
@@ -195,19 +227,70 @@ class ScannerNotifier extends Notifier<ScannerState> {
           report: completedReport,
           uploadProgress: 1.0,
           statusText: 'Análise concluída com sucesso!',
+          clearPendingAnalysisId: true,
         );
         await ref.read(historyNotifierProvider.notifier).addReport(completedReport);
       } else {
-        // Análise ainda em processamento assíncrono na fila do VT
+        // Análise ainda em processamento assíncrono na fila do VT: preserva estado e ID
         state = state.copyWith(
-          step: ScannerStep.completed,
-          statusText: 'Análise enfileirada no VirusTotal. Verifique o resultado em instantes no Histórico.',
+          step: ScannerStep.queued,
+          pendingAnalysisId: analysisId,
+          uploadProgress: null,
+          statusText: 'Análise enfileirada no VirusTotal. Motores ainda processando.',
         );
       }
     } catch (e) {
       state = state.copyWith(
         step: ScannerStep.error,
         errorMessage: 'Falha no envio do arquivo: $e',
+      );
+    }
+  }
+
+  /// Reconsulta o status de uma análise que permaneceu na fila do VirusTotal.
+  Future<void> recheckPendingAnalysis() async {
+    final analysisId = state.pendingAnalysisId;
+    if (analysisId == null || analysisId.isEmpty) return;
+
+    state = state.copyWith(
+      step: ScannerStep.analyzing,
+      statusText: 'Consultando status dos motores no VirusTotal...',
+      uploadProgress: 0.7,
+    );
+
+    try {
+      final completedReport = await _vtRepository.pollAnalysis(
+        analysisId: analysisId,
+        fileName: state.selectedFile?.name,
+        fileSize: state.selectedFile?.size,
+        onProgress: (statusMessage, progress) {
+          state = state.copyWith(
+            statusText: statusMessage,
+            uploadProgress: progress,
+          );
+        },
+      );
+
+      if (completedReport != null) {
+        state = state.copyWith(
+          step: ScannerStep.completed,
+          report: completedReport,
+          uploadProgress: 1.0,
+          statusText: 'Análise concluída com sucesso!',
+          clearPendingAnalysisId: true,
+        );
+        await ref.read(historyNotifierProvider.notifier).addReport(completedReport);
+      } else {
+        state = state.copyWith(
+          step: ScannerStep.queued,
+          uploadProgress: null,
+          statusText: 'O arquivo ainda está em processamento na fila do VirusTotal.',
+        );
+      }
+    } catch (e) {
+      state = state.copyWith(
+        step: ScannerStep.error,
+        errorMessage: 'Falha ao consultar status da análise: $e',
       );
     }
   }
