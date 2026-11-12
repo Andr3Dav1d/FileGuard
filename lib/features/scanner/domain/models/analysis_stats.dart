@@ -33,11 +33,13 @@ class AnalysisStats {
       suspicious: (json['suspicious'] as num?)?.toInt() ?? 0,
       undetected: (json['undetected'] as num?)?.toInt() ?? 0,
       harmless: (json['harmless'] as num?)?.toInt() ?? 0,
-      timeout:
-          ((json['timeout'] as num?)?.toInt() ?? 0) +
-          ((json['confirmed-timeout'] as num?)?.toInt() ?? 0),
+      timeout: ((json['timeout'] as num?)?.toInt() ?? 0) +
+          ((json['confirmed-timeout'] as num?)?.toInt() ?? 0) +
+          ((json['confirmed_timeout'] as num?)?.toInt() ?? 0),
       failure: (json['failure'] as num?)?.toInt() ?? 0,
-      typeUnsupported: (json['type-unsupported'] as num?)?.toInt() ?? 0,
+      typeUnsupported: (json['type-unsupported'] as num?)?.toInt() ??
+          (json['type_unsupported'] as num?)?.toInt() ??
+          0,
     );
   }
 
@@ -50,4 +52,31 @@ class AnalysisStats {
     'failure': failure,
     'type-unsupported': typeUnsupported,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AnalysisStats &&
+          runtimeType == other.runtimeType &&
+          malicious == other.malicious &&
+          suspicious == other.suspicious &&
+          undetected == other.undetected &&
+          harmless == other.harmless &&
+          timeout == other.timeout &&
+          failure == other.failure &&
+          typeUnsupported == other.typeUnsupported;
+
+  @override
+  int get hashCode =>
+      malicious.hashCode ^
+      suspicious.hashCode ^
+      undetected.hashCode ^
+      harmless.hashCode ^
+      timeout.hashCode ^
+      failure.hashCode ^
+      typeUnsupported.hashCode;
+
+  @override
+  String toString() =>
+      'AnalysisStats(malicious: $malicious, suspicious: $suspicious, undetected: $undetected, harmless: $harmless, timeout: $timeout, failure: $failure, typeUnsupported: $typeUnsupported)';
 }
